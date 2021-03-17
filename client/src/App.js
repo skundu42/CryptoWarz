@@ -1,73 +1,191 @@
-import React, { Component } from "react";
-import SimpleStorageContract from "./contracts/SimpleStorage.json";
-import getWeb3 from "./getWeb3";
+import React, { useState, useEffect } from 'react';
+import styled from 'styled-components';
+import CryptoItem from './abis/Item.json';
+import CryptoChara from './abis/Character.json';
+import Monster from './components/Monster';
+import Signin from './components/Signin';
+import initWebsocket from './util/websocket';
+import Inventory from './components/Main/Inventory';
+import Characters from './components/Characters';
+import Storage from './components/Storage';
+import Web3 from 'web3';
+import Minter from './components/Minter';
+import Market from './components/Market';
 
-import "./App.css";
+const ControlsWrapper = styled.div`
+  display: inline-block;
+`;
 
-class App extends Component {
-  state = { storageValue: 0, web3: null, accounts: null, contract: null };
+const Container = styled.div`
+  max-width: 600px;
+  margin: auto;
+  background: #fff;
+  height: 100%;
+`;
 
-  componentDidMount = async () => {
-    try {
-      // Get network provider and web3 instance.
-      const web3 = await getWeb3();
-
-      // Use web3 to get the user's accounts.
-      const accounts = await web3.eth.getAccounts();
-
-      // Get the contract instance.
-      const networkId = await web3.eth.net.getId();
-      const deployedNetwork = SimpleStorageContract.networks[networkId];
-      const instance = new web3.eth.Contract(
-        SimpleStorageContract.abi,
-        deployedNetwork && deployedNetwork.address,
-      );
-
-      // Set web3, accounts, and contract to the state, and then proceed with an
-      // example of interacting with the contract's methods.
-      this.setState({ web3, accounts, contract: instance }, this.runExample);
-    } catch (error) {
-      // Catch any errors for any of the above operations.
-      alert(
-        `Failed to load web3, accounts, or contract. Check console for details.`,
-      );
-      console.error(error);
-    }
-  };
-
-  runExample = async () => {
-    const { accounts, contract } = this.state;
-
-    // Stores a given value, 5 by default.
-    await contract.methods.set(5).send({ from: accounts[0] });
-
-    // Get the value from the contract to prove it worked.
-    const response = await contract.methods.get().call();
-
-    // Update state with the result.
-    this.setState({ storageValue: response });
-  };
-
-  render() {
-    if (!this.state.web3) {
-      return <div>Loading Web3, accounts, and contract...</div>;
-    }
-    return (
-      <div className="App">
-        <h1>Good to Go!</h1>
-        <p>Your Truffle Box is installed and ready.</p>
-        <h2>Smart Contract Example</h2>
-        <p>
-          If your contracts compiled and migrated successfully, below will show
-          a stored value of 5 (by default).
-        </p>
-        <p>
-          Try changing the value stored on <strong>line 40</strong> of App.js.
-        </p>
-        <div>The stored value is: {this.state.storageValue}</div>
-      </div>
-    );
+const characterToItems = (character) => {
+  const characterItems = {
+      2000: true,
+      12000: true,
+      1060026: true,
+      1040036: true,
+      [character.hair]: true,
+      [character.face]: true,
+      id: character.id
   }
+  
+  return characterItems
+}
+
+function App() {
+  if (!window.ws) {
+    initWebsocket(() => {
+      setCharacter(character)
+    });
+  }
+
+  const [characters, setCharacters] = useState([])
+  const [character, setCharacterState] = useState({})
+
+  const [inventory, setInventory] = useState({
+    items: [],
+  });
+
+  const [account, setAccount] = useState('');
+  const [itemContract, setItemContract] = useState('');
+  const [charaContract, setCharaContract] = useState('');
+  const [allItems, setAllItems] = useState([]);
+  const [selected, setSelected] = useState('');
+
+  const setCharacter = (character) => {
+    const ws = window.ws
+    account && ws.readyState === 1 && ws.send(JSON.stringify({ newUser: true, username: account, color: character }))
+    setCharacterState(character)
+  }
+
+  const [openMarket, setOpenMarket] = useState(false);
+  const [market, setMarket] = useState([]);
+  const setAttack = (attack) => {
+    window.attack = attack
+    setAttackState(attack)
+  }
+  const [attack, setAttackState] = useState(0);
+
+  useEffect(() => {
+    loadWeb3();
+    loadBlockchainData();
+  }, []);
+
+  const loadWeb3 = async () => {
+    if (window.ethereum) {
+      window.web3 = new Web3(window.ethereum);
+      await window.ethereum.enable();
+    } else if (window.web3) {
+      window.web3 = new Web3(window.web3.currentProvider);
+    } else {
+      window.alert('Non-Ethereum browser detected');
+    }
+  };
+
+  const loadBlockchainData = async () => {
+    const web3 = window.web3;
+    const accounts = await web3.eth.getAccounts();
+    window.account = accounts[0]
+
+    setAccount(accounts[0]);
+
+    const networkId = await web3.eth.net.getId();
+    const itemNetworkData = CryptoItem.networks[networkId];
+    const charaNetworkData = CryptoChara.networks[networkId];
+    if (itemNetworkData) {
+      const abi = CryptoItem.abi;
+      const address = itemNetworkData.address;
+      const itemContract = new web3.eth.Contract(abi, address);
+      setItemContract(itemContract);
+      const totalSupply = await itemContract.methods.totalSupply().call();
+      const result = [];
+
+      for (let i = 1; i <= totalSupply; i++) {
+        const item = await itemContract.methods.items(i - 1).call();
+        allItems.push(item);
+        setAllItems(allItems);
+        const owner = await itemContract.methods.ownerOf(i - 1).call();
+        if (owner === accounts[0]) {
+          result.push({
+            id: item[0],
+            attack: item[2].toNumber()
+          })
+        }
+      }
+      setInventory({
+        ...inventory,
+        items: result,
+      });
+    }
+    if (charaNetworkData) {
+      const abi = CryptoChara.abi;
+      const address = charaNetworkData.address;
+      const charaContract = new web3.eth.Contract(abi, address);
+      setCharaContract(charaContract);
+      const totalSupply = await charaContract.methods.totalSupply().call();
+      const result = [];
+      const marketplace = [];
+      for (let i = 1; i <= totalSupply; i++) {
+        const character = await charaContract.methods.characters(i - 1).call();
+        const owner = await charaContract.methods.ownerOf(i - 1).call();
+        if (owner === accounts[0]) {
+          result.push(character)
+        }
+        marketplace.push(character)
+      }
+      
+      setAttack(result[0]?.attack.toNumber())
+      setCharacters(result)
+      setSelected(result[0])
+      setCharacter(characterToItems(result[0] || {}))
+      setMarket(marketplace)
+    } else {
+      window.alert(`smart contract not on network`);
+    }
+  };
+
+  const handleBreed = async (c) => {
+      const spouse = c.id
+      const self = character.id
+      console.log('chosen to breed with', self, spouse)
+      if (spouse === self) {
+        console.log('cannot mate with self')
+      } else {
+        console.log('chosen to breed with', self, spouse)
+        console.log(charaContract)
+        await charaContract.methods.createHero(self, spouse).send({ from: account })
+      }
+  }
+
+  return (
+    <>
+    <Container>
+      <ControlsWrapper>
+        <Signin />
+        <Minter
+          account={account}
+          itemContract={itemContract}
+          charaContract={charaContract}
+          allItems={allItems}
+          setAllItems={setAllItems}
+        />
+      </ControlsWrapper>
+      <Monster />
+      <Inventory openMarket={() => setOpenMarket(!openMarket)}/>
+      <Market breed={handleBreed} characters={market} visible={openMarket}/>
+      <Storage attack={attack} setAttack={setAttack} setCharacter={setCharacter} character={character} inventory={inventory} />
+      Characters
+      <br/>
+      <Characters attack={attack} setAttack={setAttack} characters={characters} selected={selected} setSelected={setSelected} setCharacter={setCharacter} />
+      {account}
+    </Container>
+    </>
+  );
 }
 
 export default App;
