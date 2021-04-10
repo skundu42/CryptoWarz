@@ -1,5 +1,6 @@
-const path = require("path");
-
+ //require('babel-register');
+ //require('babel-polyfill');
+ const HDWalletProvider = require('@truffle/hdwallet-provider');
 module.exports = {
   networks: {
     development: {
@@ -7,9 +8,24 @@ module.exports = {
       port: 7545,
       network_id: "*" // Match any network id
     },
+    rinkeby: {
+      provider: () => new HDWalletProvider(`mystery knee invite surface strike student lottery author medal bridge cricket trumpet`, `https://rinkeby.infura.io/v3/fd51fc7e7565472e87d8ab4a2ba964db`),
+      network_id: 4,       // Ropsten's id
+      gas: 5500000,        // Ropsten has a lower block limit than mainnet
+      confirmations: 2,    // # of confs to wait between deployments. (default: 0)
+      timeoutBlocks: 200,  // # of blocks before a deployment times out  (minimum/default: 50)
+      skipDryRun: true     // Skip dry run before migrations? (default: false for public nets )
+    },
+    matic: {
+      provider: () => new HDWalletProvider(mystery knee invite surface strike student lottery author medal bridge cricket trumpet, `https://rpc-mumbai.matic.today`),
+      network_id: 80001,
+      confirmations: 2,
+      timeoutBlocks: 200,
+      skipDryRun: true
+    },
   },
-  contracts_directory: './client/src/contracts/',
-  contracts_build_directory: './client/src/abis/',
+  contracts_directory: './src/contracts/',
+  contracts_build_directory: './src/abis/',
   compilers: {
     solc: {
       optimizer: {
