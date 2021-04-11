@@ -1,5 +1,7 @@
 # CryptoWarz - A Decentralized Ethereum Blockchain based RPG Game
 
+![Screenshot 2021-04-10 202711](https://user-images.githubusercontent.com/69718573/114294129-ef56c300-9ab9-11eb-84f9-07c3d5312c23.png)
+
 An RPG game based on Ethereum where you need to create and evolve unique characters to destroy all the monsters of the Cryptoland.
 
 Features:
